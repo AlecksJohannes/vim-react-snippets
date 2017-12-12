@@ -1,0 +1,305 @@
+
+snippet clib "Library" b
+#innclude <stdio.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <stdlib.h>
+#include <netinet/in.h>
+#include <string.h>
+endsnippet
+
+snippet serlib "Server lib" b
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <stdio.h>
+#include <string.h>
+#include <netinet/in.h>
+#include <stdlib.h>
+#define MAXLINE 1024
+endsnippet
+
+snippet sig_chld "Signal" b 
+void sig_chld(int signo) {
+	pid_t pid;
+	int stat;
+	while((pid = waitpid(-1, &stat, WNOHANG)) > 0) {
+		printf("child %d terminated \n", pid);
+	}
+	return;
+}
+endsnippet 
+
+
+snippet tcp "Transmission Control Protocol" b
+int main(int argc, char **argv) {
+	int listenfd, connfd, valuereader;
+	int count = 0 ;
+	int pid =0;
+	char buff[1024];
+	char result[1024] = "Input your password:";
+	struct sockaddr_in serveraddr;
+	listenfd = socket(AF_INET, SOCK_STREAM , 0);
+	bzero(&serveraddr, sizeof(serveraddr));
+	serveraddr.sin_family = AF_INET;
+	serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
+	serveraddr.sin_port = htons(6002);
+	bind(listenfd, (struct sockaddr *)&serveraddr, sizeof(serveraddr));
+	listen(listenfd, 3);
+	signal(SIGCHLD, sig_chld);
+	for(;;)
+	{
+		connfd = accept(listenfd, (struct sockaddr *)NULL, NULL);
+		if ((pid = fork()) == -1)
+		{
+			close(connfd);
+			continue;
+		}
+		else if(pid > 0)
+		{
+			close(connfd);
+			printf("here2\n");
+			continue;
+		}
+		else if(pid == 0)
+		{
+			close(connfd);
+			break;
+		}
+		printf("%s \n ", buff);
+		return 0;
+	}
+}
+endsnippet
+
+snippet client "Client" b
+int main(int argc, char const *argv[])
+{
+	int sock, valread;
+	struct sockaddr_in serv_addr;
+	char sum[1024] = "alecks";
+	char sum2[100] = "String 1:";
+	char buffer[1024];
+	char string1[100];
+	char string2[100];
+	char haha[1024];
+	char password[1024];
+	if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+	{
+		printf("\n Socket creation error \n");
+		return -1;
+	}
+	bzero(&serv_addr, sizeof(serv_addr));
+	serv_addr.sin_family = AF_INET;
+	serv_addr.sin_port = htons(6002);
+	if(inet_pton(AF_INET, argv[1], &serv_addr.sin_addr)<=0)
+	{
+		printf("Wrong \n");
+	}
+	if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
+	{
+		printf("\nConnection Failed \n");
+	}
+	send(sock, sum, strlen(sum), 0);
+	read(sock, buffer, 1024);
+	printf("%s \n", buffer);
+	memset(buffer, 0, sizeof buffer);
+	scanf("%s", &password);
+	send(sock, password, strlen(password), 0);
+	read(sock, buffer, 1024);
+
+	return 0;
+}
+endsnippet
+
+snippet udpserv "UDP server" b
+
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
+#include <netdb.h>
+#include <sys/types.h> 
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <string.h>
+
+
+#define BUFSIZE 1024
+
+void error(char *msg) {
+  perror(msg);
+  exit(1);
+}
+
+int main(int argc, char **argv) {
+  int sockfd; /* socket */
+  int portno; /* port to listen on */
+  int clientlen; /* byte size of client's address */
+  struct sockaddr_in serveraddr; /* server's addr */
+  struct sockaddr_in clientaddr; /* client addr */
+  struct hostent *hostp; /* client host info */
+  char buf[BUFSIZE]; /* message buf */
+  char line[1024];
+  char *hostaddrp; /* dotted decimal host addr string */
+  int optval; /* flag value for setsockopt */
+  int n; /* message byte size */
+
+  char converted[1024];
+  if (argc != 2) {
+    fprintf(stderr, "usage: %s <port>\n", argv[0]);
+    exit(1);
+  }
+  portno = atoi(argv[1]);
+
+  sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+  if (sockfd < 0) 
+    error("ERROR opening socket");
+
+  optval = 1;
+  setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, 
+	     (const void *)&optval , sizeof(int));
+
+  /*
+   * build the server's Internet address
+   */
+  bzero((char *) &serveraddr, sizeof(serveraddr));
+  serveraddr.sin_family = AF_INET;
+  serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
+  serveraddr.sin_port = htons((unsigned short)portno);
+
+  if (bind(sockfd, (struct sockaddr *) &serveraddr, 
+	   sizeof(serveraddr)) < 0) 
+    error("ERROR on binding");
+
+  clientlen = sizeof(clientaddr);
+  while (1) {
+
+    bzero(buf, BUFSIZE);
+    n = recvfrom(sockfd, buf, BUFSIZE, 0,
+		 (struct sockaddr *) &clientaddr, &clientlen);
+    if (n < 0)
+      error("ERROR in recvfrom");
+
+    hostp = gethostbyaddr((const char *)&clientaddr.sin_addr.s_addr, 
+			  sizeof(clientaddr.sin_addr.s_addr), AF_INET);
+    if (hostp == NULL)
+      error("ERROR on gethostbyaddr");
+    hostaddrp = inet_ntoa(clientaddr.sin_addr);
+    if (hostaddrp == NULL)
+      error("ERROR on inet_ntoa\n");
+    printf("server received datagram from %s (%s)\n", 
+	   hostp->h_name, hostaddrp);
+		printf("server received %d/%d bytes: %s\n", strlen(buf), n, buf);
+    /*
+		const char separator = 'x';
+		int j = 0;
+		int i = 0;
+		char * const sep_at = strchr(buf, separator);
+    if(sep_at != NULL)
+    {
+      *sep_at = '\0'; 
+      int n = atoi(buf);
+      int m = atoi(sep_at + 1);
+      if (fp) {
+        for(i = 0; i < n; i++) {
+          for(j = 0; j < m; j++) {
+            fprintf(fp, "%d", j);
+          }
+          fprintf(fp, "\n");
+        }
+      }
+      fclose(fp);
+    }
+    while (fgets(line, sizeof(line), input)) {
+      sendto(sockfd, line, strlen(line), 0, 
+          (struct sockaddr *) &clientaddr, clientlen);
+
+    }
+    fclose(input);
+    */
+
+    if(strstr(buf, "please")) {
+      strncpy(converted, "We are always ready to serve you", 100);
+      sendto(sockfd, converted, strlen(converted), 0, 
+          (struct sockaddr *) &clientaddr, clientlen);
+    } else {
+      strncpy(converted, "Wrong key word", 100);
+      printf("%s \n", converted);
+      sendto(sockfd, converted, strlen(converted), 0, 
+          (struct sockaddr *) &clientaddr, clientlen);
+    }
+  }
+}
+endsnippet
+
+
+snippet udpclient "UDP client" b
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h> 
+
+#define BUFSIZE 1024
+
+/* 
+ * error - wrapper for perror
+ */
+void error(char *msg) {
+    perror(msg);
+    exit(0);
+}
+
+int main(int argc, char **argv) {
+    int sockfd, portno, n;
+    int serverlen;
+    struct sockaddr_in serveraddr;
+    struct hostent *server;
+    char *hostname;
+    char buf[BUFSIZE];
+
+    if (argc != 3) {
+       fprintf(stderr,"usage: %s <hostname> <port>\n", argv[0]);
+       exit(0);
+    }
+    hostname = argv[1];
+    portno = atoi(argv[2]);
+
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd < 0) 
+        error("ERROR opening socket");
+
+    server = gethostbyname(hostname);
+    if (server == NULL) {
+        fprintf(stderr,"ERROR, no such host as %s\n", hostname);
+        exit(0);
+    }
+
+    bzero((char *) &serveraddr, sizeof(serveraddr));
+    serveraddr.sin_family = AF_INET;
+    bcopy((char *)server->h_addr, 
+	  (char *)&serveraddr.sin_addr.s_addr, server->h_length);
+    serveraddr.sin_port = htons(portno);
+
+    bzero(buf, BUFSIZE);
+    printf("Enter n x m matrix ");
+    fgets(buf, BUFSIZE, stdin);
+
+    serverlen = sizeof(serveraddr);
+    n = sendto(sockfd, buf, strlen(buf), 0, &serveraddr, serverlen);
+    if (n < 0) 
+      error("ERROR in sendto");
+    int i = 0;
+    while(i > 100) {
+      n = recvfrom(sockfd, buf, strlen(buf), 0, &serveraddr, &serverlen);
+      i++;
+    }
+    printf("%s \n", buf);
+
+		return 0;
+}
+endsnippet
